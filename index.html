@@ -61,7 +61,7 @@
                 geojsonLayer = L.geoJSON(data, {
                     style: function(f) {
                         var r = veriler["bolge" + f.properties.fid]?.risk || 0;
-                        return { color: r==2 ? '#e74c3c' : (r==1 ? '#f1c40f' : '#2ecc71'), weight: 6 };
+                        return { color: r==2 ? '#e74c3c' : (r==1 ? '#f1c40f' : '#2ecc71'), weight: 3 };
                     }
                 }).addTo(map);
 
