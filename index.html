@@ -1,97 +1,77 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>T-EUS PRO | Trabzon Havza Kontrol Merkezi</title>
+    <title>T-EUS | Trabzon Taşkın Kontrol Merkezi</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; display: flex; }
-        #sidebar { width: 320px; height: 100vh; background: #222; padding: 20px; box-shadow: 2px 0 15px rgba(0,0,0,0.5); overflow-y: auto; z-index: 1000; }
+        #sidebar { width: 350px; height: 100vh; background: #252525; padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.5); overflow-y: auto; z-index: 1000; }
         #map { flex-grow: 1; height: 100vh; }
-        .logo { color: #11caa0; font-weight: bold; font-size: 26px; letter-spacing: 1px; }
-        .status-card { background: #333; padding: 15px; border-radius: 12px; margin-bottom: 12px; border-left: 6px solid #444; transition: 0.3s; }
-        .risk-0 { border-color: #2ecc71; } 
-        .risk-1 { border-color: #f1c40f; } 
-        .risk-2 { border-color: #e74c3c; }
-        .legend { position: absolute; bottom: 40px; right: 20px; background: rgba(255,255,255,0.9); color: #333; padding: 15px; border-radius: 10px; z-index: 1000; font-size: 13px; line-height: 1.8; box-shadow: 0 0 20px rgba(0,0,0,0.3); }
-        .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; float: right; color: white; }
+        .logo { color: #11caa0; font-weight: bold; font-size: 24px; margin-bottom: 5px; }
+        .status-card { background: #333; padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid #444; }
+        .risk-0 { border-color: #2ecc71; } .risk-1 { border-color: #f1c40f; } .risk-2 { border-color: #e74c3c; }
+        .legend { position: absolute; bottom: 30px; right: 30px; background: white; color: black; padding: 15px; border-radius: 8px; z-index: 1000; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div id="sidebar">
         <div class="logo">T-EUS PRO</div>
-        <p style="font-size: 11px; color: #888; margin-bottom: 20px;">HAVZA BAZLI TAŞKIN İZLEME</p>
-        <div id="last-update" style="font-size: 12px; color: #11caa0; margin-bottom: 20px;">Veri bekleniyor...</div>
-        <div id="dere-listesi"></div>
+        <p style="font-size: 12px; color: #888;">TRABZON ERKEN UYARI SİSTEMİ</p>
+        <hr style="border: 0.5px solid #444;">
+        <div id="last-update" style="font-size: 13px; margin-bottom: 20px;">Bağlanılıyor...</div>
+
+        <div id="dere-listesi">
+            </div>
     </div>
     <div id="map"></div>
 
     <div class="legend">
-        <b style="font-size: 15px;">Havza Durumları</b><br>
-        <i style="background: #e74c3c; width: 12px; height: 12px; display: inline-block; border-radius: 50%;"></i> Taşkın Riski (Kritik)<br>
-        <i style="background: #f1c40f; width: 12px; height: 12px; display: inline-block; border-radius: 50%;"></i> Uyarı Seviyesi<br>
-        <i style="background: #2ecc71; width: 12px; height: 12px; display: inline-block; border-radius: 50%;"></i> Güvenli Seviye
+        <strong>RİSK SEVİYELERİ</strong><br>
+        <i style="background: #e74c3c; width: 15px; height: 15px; display: inline-block;"></i> Taşkın Riski (Kritik)<br>
+        <i style="background: #f1c40f; width: 15px; height: 15px; display: inline-block;"></i> Uyarı Seviyesi<br>
+        <i style="background: #2ecc71; width: 15px; height: 15px; display: inline-block;"></i> Normal Seviye
     </div>
 
     <script>
-        // 1. Harita Kurulumu
-        var map = L.map('map').setView([40.95, 39.85], 11);
+        var map = L.map('map').setView([40.95, 39.75], 11);
+        // Dark Mode Harita Tasarımı
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-        // 2. Firebase Bağlantısı (URL'yi kontrol et!)
-        const firebaseConfig = { 
-            databaseURL: "https://taskin-uyari-default-rtdb.europe-west1.firebasedatabase.app" 
-        };
+        const firebaseConfig = { databaseURL: "https://taskin-uyari-default-rtdb.europe-west1.firebasedatabase.app" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
         var geojsonLayer;
 
-        // 3. Veri Dinleme ve Harita Güncelleme
         db.ref('dere_durumlari').on('value', (snapshot) => {
             const veriler = snapshot.val();
-            if(!veriler) return;
-
-            console.log("Firebase'den gelen taze veri:", veriler);
-
             const listeDiv = document.getElementById('dere-listesi');
             const updateDiv = document.getElementById('last-update');
             listeDiv.innerHTML = "";
-            updateDiv.innerText = "Son Senkronizasyon: " + new Date().toLocaleTimeString();
+            updateDiv.innerText = "Son Güncelleme: " + new Date().toLocaleTimeString();
 
-            // Haritayı Yenile
-            fetch('dereler.geojson?v=' + Date.now()).then(res => res.json()).then(data => {
+            // Haritayı Güncelle
+            fetch('derecik.geojson').then(res => res.json()).then(data => {
                 if (geojsonLayer) map.removeLayer(geojsonLayer);
-                
                 geojsonLayer = L.geoJSON(data, {
                     style: function(f) {
-                        // QGIS'ten gelen bolge_id veya Bolge_id sütununa bak
-                        var havzaNo = f.properties.bolge_id || f.properties.Bolge_id;
-                        var r = veriler["bolge" + havzaNo]?.risk || 0;
-                        
-                        return { 
-                            color: r == 2 ? '#e74c3c' : (r == 1 ? '#f1c40f' : '#2ecc71'), 
-                            weight: 4,
-                            opacity: 0.9
-                        };
+                        var r = veriler["derecik"]?.risk || 0;
+                        return { color: r==2 ? '#e74c3c' : (r==1 ? '#f1c40f' : '#2ecc71'), weight: 6 };
                     }
                 }).addTo(map);
 
-                // Sol Paneli Güncelle (3 Havza İçin)
-                ["bolge1", "bolge2", "bolge3"].forEach(b => {
-                    const item = veriler[b];
-                    const isim = b == "bolge1" ? "BATI HAVZASI" : (b == "bolge2" ? "MERKEZ HAVZASI" : "DOĞU HAVZASI");
-                    const renk = item.risk == 2 ? '#e74c3c' : (item.risk == 1 ? '#f1c40f' : '#2ecc71');
-                    const durum = item.risk == 2 ? 'TAŞKIN' : (item.risk == 1 ? 'UYARI' : 'GÜVENLİ');
-
+                // Listeyi Güncelle
+                Object.keys(veriler).forEach(key => {
+                    const item = veriler[key];
                     listeDiv.innerHTML += `
                         <div class="status-card risk-${item.risk}">
-                            <span class="badge" style="background:${renk}">${durum}</span>
-                            <strong>${isim}</strong><br>
-                            <span style="font-size: 13px; color: #bbb;">Seviye: ${item.seviye} cm</span>
+                            <strong>${key.toUpperCase()}</strong><br>
+                            Seviye: ${item.seviye} cm <span class="badge" style="background:${item.risk==2?'#e74c3c':(item.risk==1?'#f1c40f':'#2ecc71')}">${item.risk==2?'TAŞKIN':(item.risk==1?'UYARI':'GÜVENLİ')}</span>
                         </div>
                     `;
                 });
