@@ -25,8 +25,7 @@
         <hr style="border: 0.5px solid #444;">
         <div id="last-update" style="font-size: 13px; margin-bottom: 20px;">Bağlanılıyor...</div>
 
-        <div id="dere-listesi">
-            </div>
+        <div id="dere-listesi"></div>
     </div>
     <div id="map"></div>
 
@@ -38,8 +37,8 @@
     </div>
 
     <script>
-        var map = L.map('map').setView([40.95, 39.75], 11);
-        // Dark Mode Harita Tasarımı
+        // Haritayı Değirmendere/Derecik bölgesine odakla
+        var map = L.map('map').setView([40.90, 39.70], 12);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
 
         const firebaseConfig = { databaseURL: "https://taskin-uyari-default-rtdb.europe-west1.firebasedatabase.app" };
@@ -47,7 +46,38 @@
         const db = firebase.database();
 
         var geojsonLayer;
+        var geoData = null;
 
+        function renkVer(risk) {
+            return risk == 2 ? '#e74c3c' : (risk == 1 ? '#f1c40f' : '#2ecc71');
+        }
+
+        function haritayiCiz(veriler) {
+            if (!geoData) return;
+            if (geojsonLayer) map.removeLayer(geojsonLayer);
+
+            var risk = (veriler && veriler["derecik"] && veriler["derecik"].risk) || 0;
+
+            geojsonLayer = L.geoJSON(geoData, {
+                style: function() {
+                    return { color: renkVer(risk), weight: 6 };
+                }
+            }).addTo(map);
+
+            if (geojsonLayer.getBounds().isValid()) {
+                map.fitBounds(geojsonLayer.getBounds(), { padding: [30, 30] });
+            }
+        }
+
+        // GeoJSON'u bir kez yükle
+        fetch('derecik.geojson')
+            .then(res => res.json())
+            .then(data => {
+                geoData = data;
+                haritayiCiz(null);
+            });
+
+        // Firebase değişikliklerini dinle
         db.ref('dere_durumlari').on('value', (snapshot) => {
             const veriler = snapshot.val();
             const listeDiv = document.getElementById('dere-listesi');
@@ -55,41 +85,19 @@
             listeDiv.innerHTML = "";
             updateDiv.innerText = "Son Güncelleme: " + new Date().toLocaleTimeString();
 
-            // Haritayı Güncelle
-            fetch('derecik.geojson').then(res => res.json()).then(data => {
-                if (geojsonLayer) map.removeLayer(geojsonLayer);
-                geojsonLayer = L.geoJSON(data, {
-                    style: function(f) {
-
-    let bolge = "";
-
-    if(f.properties.fid == 4) bolge = "bolge1";
-    if(f.properties.fid == 17) bolge = "bolge2";
-    if(f.properties.fid == 5) bolge = "bolge3";
-
-    let r = veriler[bolge]?.risk || 0;
-
-    return {
-        color:
-            r==2 ? '#e74c3c' :
-            r==1 ? '#f1c40f' :
-            '#2ecc71',
-        weight: 6
-    };
-}
-                }).addTo(map);
-
-                // Listeyi Güncelle
+            if (veriler) {
                 Object.keys(veriler).forEach(key => {
                     const item = veriler[key];
                     listeDiv.innerHTML += `
                         <div class="status-card risk-${item.risk}">
                             <strong>${key.toUpperCase()}</strong><br>
-                            Seviye: ${item.seviye} cm <span class="badge" style="background:${item.risk==2?'#e74c3c':(item.risk==1?'#f1c40f':'#2ecc71')}">${item.risk==2?'TAŞKIN':(item.risk==1?'UYARI':'GÜVENLİ')}</span>
+                            Seviye: ${item.seviye} cm <span class="badge" style="background:${renkVer(item.risk)}">${item.risk==2?'TAŞKIN':(item.risk==1?'UYARI':'GÜVENLİ')}</span>
                         </div>
                     `;
                 });
-            });
+            }
+
+            haritayiCiz(veriler);
         });
     </script>
 </body>
