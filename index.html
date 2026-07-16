@@ -60,9 +60,23 @@
                 if (geojsonLayer) map.removeLayer(geojsonLayer);
                 geojsonLayer = L.geoJSON(data, {
                     style: function(f) {
-                        var r = veriler["derecik"]?.risk || 0;
-                        return { color: r==2 ? '#e74c3c' : (r==1 ? '#f1c40f' : '#2ecc71'), weight: 6 };
-                    }
+
+    let bolge = "";
+
+    if(f.properties.fid == 4) bolge = "bolge1";
+    if(f.properties.fid == 17) bolge = "bolge2";
+    if(f.properties.fid == 5) bolge = "bolge3";
+
+    let r = veriler[bolge]?.risk || 0;
+
+    return {
+        color:
+            r==2 ? '#e74c3c' :
+            r==1 ? '#f1c40f' :
+            '#2ecc71',
+        weight: 6
+    };
+}
                 }).addTo(map);
 
                 // Listeyi Güncelle
